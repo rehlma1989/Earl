@@ -25,6 +25,7 @@ class Utils {
   static final String ATOM_NAMESPACE = "http://www.w3.org/2005/Atom";
   static final String MEDIA_NAMESPACE = "http://search.yahoo.com/mrss/";
   static final String ITUNES_NAMESPACE = "http://www.itunes.com/dtds/podcast-1.0.dtd";
+  static final String CONTENT_NAMESPACE = "http://purl.org/rss/1.0/modules/content/";
 
   private static final String TAG = "Earl.Utils";
   private static final DateFormat rfc822DateTimeFormat = new SimpleDateFormat(
@@ -44,6 +45,7 @@ class Utils {
   private static DateFormat RFC3339Ms;
   private static DateFormat RFC3339Tz;
   private static DateFormat RFC3339TzMs;
+  private static DateFormat ISO8601;
 
   static void setupRFC3339() {
     RFC3339 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
@@ -52,6 +54,7 @@ class Utils {
     RFC3339Tz = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.US);
     RFC3339TzMs = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ", Locale.US);
     RFC3339TzMs.setLenient(true);
+    ISO8601 = new SimpleDateFormat("yyy-MM-dd'T'HH:mm:ssZZZZZ", Locale.US);
   }
 
   /**
@@ -75,18 +78,24 @@ class Utils {
         return date;
       }
 
-      //step one, split off the timezone.
-      String firstPart = string.substring(0, string.lastIndexOf('-'));
-      String secondPart = string.substring(string.lastIndexOf('-'));
-
-      //step two, remove the colon from the timezone offset
-      secondPart = secondPart.substring(0, secondPart.indexOf(':')) + secondPart
-          .substring(secondPart.indexOf(':') + 1);
-      string = firstPart + secondPart;
       try {
-        date = RFC3339Tz.parse(string);
+        date = ISO8601.parse(string);
+
+        //step one, split off the timezone.
+        String firstPart = string.substring(0, string.lastIndexOf('-'));
+        String secondPart = string.substring(string.lastIndexOf('-'));
+
+        //step two, remove the colon from the timezone offset
+        secondPart = secondPart.substring(0, secondPart.indexOf(':')) + secondPart
+                .substring(secondPart.indexOf(':') + 1);
+
+        string = firstPart + secondPart;
       } catch (java.text.ParseException pe) {//try again with optional decimals
-        date = RFC3339TzMs.parse(string);
+        try {
+          date = RFC3339Tz.parse(string);
+        } catch (java.text.ParseException pe1) {//try again with +01:00
+          date = RFC3339TzMs.parse(string);
+        }
       }
       return date;
     } catch (ParseException exception) {

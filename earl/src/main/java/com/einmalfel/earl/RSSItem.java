@@ -3,18 +3,12 @@ package com.einmalfel.earl;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
-
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.IOException;
 import java.net.URL;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class RSSItem implements Item {
   static final String XML_TAG = "item";
@@ -46,6 +40,8 @@ public class RSSItem implements Item {
   public final ItunesItem itunes;
   @Nullable
   public final MediaItem media;
+  @Nullable
+  public final ContentEncoded content_encoded;
 
   @NonNull
   static RSSItem read(@NonNull XmlPullParser parser) throws IOException, XmlPullParserException {
@@ -55,6 +51,7 @@ public class RSSItem implements Item {
     List<RSSCategory> categories = new LinkedList<>();
     RSSGuid guid = null;
     RSSSource source = null;
+    ContentEncoded content_encoded = null;
     ItunesItem.ItunesItemBuilder itunesBuilder = null;
     MediaItem.MediaItemBuilder mediaBuilder = null;
     while (parser.nextTag() == XmlPullParser.START_TAG) {
@@ -81,6 +78,13 @@ public class RSSItem implements Item {
               Log.w(TAG, "Unknown RSS item tag " + tagName);
               Utils.skipTag(parser);
             }
+        }
+      } else if (Utils.CONTENT_NAMESPACE.equalsIgnoreCase(namespace)) {
+        String tagName = parser.getName();
+        if (tagName.equals(ContentEncoded.XML_TAG)) {
+          content_encoded = ContentEncoded.parseTag(parser);
+        } else {
+          Utils.skipTag(parser);
         }
       } else if (Utils.ITUNES_NAMESPACE.equalsIgnoreCase(namespace)) {
         if (itunesBuilder == null) {
@@ -114,14 +118,15 @@ public class RSSItem implements Item {
         map.containsKey(ST.pubDate) ? Utils.parseRFC822Date(map.remove(ST.pubDate)) : null,
         source,
         itunesBuilder == null ? null : itunesBuilder.build(),
-        mediaBuilder == null ? null : mediaBuilder.build());
+        mediaBuilder == null ? null : mediaBuilder.build(),
+        content_encoded);
   }
 
   public RSSItem(@Nullable String title, @Nullable URL link, @Nullable String description,
                  @Nullable String author, @NonNull List<RSSCategory> categories,
                  @Nullable URL comments, @NonNull List<RSSEnclosure> enclosures,
                  @Nullable RSSGuid guid, @Nullable Date pubDate, @Nullable RSSSource source,
-                 @Nullable ItunesItem itunes, @Nullable MediaItem media) {
+                 @Nullable ItunesItem itunes, @Nullable MediaItem media, @Nullable ContentEncoded content_encoded) {
     this.title = title;
     this.link = link;
     this.description = description;
@@ -134,6 +139,7 @@ public class RSSItem implements Item {
     this.source = source;
     this.itunes = itunes;
     this.media = media;
+    this.content_encoded = content_encoded;
   }
 
   @Nullable
@@ -169,6 +175,9 @@ public class RSSItem implements Item {
     if (description != null) {
       return description;
     }
+    if (content_encoded != null) {
+      return content_encoded.encoded;
+    }
     if (itunes != null && itunes.subtitle != null) {
       return itunes.subtitle;
     }
@@ -182,6 +191,11 @@ public class RSSItem implements Item {
   }
 
   @Nullable
+  public ContentEncoded getContentEncoded() {
+    return content_encoded == null ? null : content_encoded;
+  }
+
+  @Nullable
   @Override
   public String getImageLink() {
     if (itunes != null && itunes.image != null) {
@@ -189,6 +203,9 @@ public class RSSItem implements Item {
     }
     if (media != null && !media.thumbnails.isEmpty()) {
       return media.thumbnails.get(0).url.toString();
+    }
+    else if (content_encoded != null && content_encoded.image != null) {
+      return content_encoded.image.toString();
     }
     return null;
   }
